@@ -12,21 +12,16 @@ jobs:
     strategy:
       matrix:
         build_env:
+          - tag: "23.05.5"
+            pkgarch: aarch64_cortex-a53
+            target: mediatek
+            subtarget: 	mt7622
+            vermagic: "4df1170d203681f87395690076ea93d3"
           - tag: "22.03.4"
-            pkgarch: mips_24kc
-            target: ath79
-            subtarget: nand
-            vermagic: "5c9be91b90bda5403fe3a7c4e8ddb26f"
-          - tag: "23.05.0"
-            pkgarch: mipsel_24kc
-            target: ramips
-            subtarget: mt7621
-            vermagic: "9c242f353867f49a96054ff8c9f2c460"
-          - tag: "23.05.2"
-            pkgarch: mipsel_24kc
-            target: ramips
-            subtarget: mt7621
-            vermagic: "9c242f353867f49a96054ff8c9f2c460"
+            pkgarch: aarch64_cortex-a53
+            target: mediatek
+            subtarget: 	mt7622
+            vermagic: "c65e538a4b309c4bc6d8132da60431be"
 
     steps:
       - uses: actions/checkout@v4
