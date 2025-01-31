@@ -56,6 +56,9 @@ jobs:
           echo "src-git awgopenwrt https://github.com/yury-sannikov/awg-openwrt.git" >> ./feeds.conf
           ./scripts/feeds update && ./scripts/feeds install -a
 
+          mkdir -p package/feeds/packages/xtables-wgobfs
+          wget https://raw.githubusercontent.com/infinet/xt_wgobfs/refs/heads/main/openwrt/package/Makefile -O package/feeds/packages/xtables-wgobfs/Makefile
+          
           # Setup config with AWG and dependencies
           wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/config.buildinfo -O .config
           echo "CONFIG_PACKAGE_kmod-amneziawg=m" >> .config
@@ -64,6 +67,11 @@ jobs:
           echo "CONFIG_PACKAGE_kmod-crypto-lib-chacha20=m" >> .config
           echo "CONFIG_PACKAGE_kmod-crypto-lib-chacha20poly1305=m" >> .config
           echo "CONFIG_PACKAGE_kmod-crypto-chacha20poly1305=m" >> .config
+          echo "CONFIG_PACKAGE_iptables-mod-wgobfs=m" >> .config
+          echo "CONFIG_PACKAGE_iptables-nft=m" >> .config
+          echo "CONFIG_PACKAGE_xtables-nft=m" >> .config
+
+
 
           make defconfig
 
@@ -111,6 +119,10 @@ jobs:
           make V=s package/amneziawg-tools/{clean,download,prepare}
           make V=s package/amneziawg-tools/compile
 
+          ./scripts/feeds install xtables-addons
+          make V=s package/xtables-wgobfs/{clean,download,prepare}
+          make V=s package/xtables-wgobfs/compile
+          
       - name: Prepare artifacts
         run: |
           tag_name=${{  github.ref_name }}
@@ -119,6 +131,9 @@ jobs:
           cp bin/packages/${{ matrix.build_env.pkgarch }}/awgopenwrt/amneziawg-tools_*.ipk awgrelease/amneziawg-tools_${postfix}.ipk
           cp bin/packages/${{ matrix.build_env.pkgarch }}/awgopenwrt/luci-app-amneziawg_*.ipk awgrelease/luci-app-amneziawg_${postfix}.ipk
           cp bin/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/packages/kmod-amneziawg_*.ipk awgrelease/kmod-amneziawg_${postfix}.ipk
+
+          cp bin/packages/${{ matrix.build_env.pkgarch }}/awgopenwrt/iptables-mod-wgobfs_*.ipk awgrelease/iptables-mod-wgobfs_${postfix}.ipk
+          cp bin/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/packages/kmod-ipt-wgobfs_*.ipk awgrelease/kmod-ipt-wgobfs_${postfix}.ipk
 
       - name: Release
         uses: softprops/action-gh-release@v1
