@@ -54,7 +54,9 @@ jobs:
           # Setup & install feeds
           wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/feeds.buildinfo -O feeds.conf
           echo "src-git awgopenwrt https://github.com/yury-sannikov/awg-openwrt.git" >> ./feeds.conf
-          ./scripts/feeds update && ./scripts/feeds install -a
+          ./scripts/feeds update 
+          #####   && ./scripts/feeds install -a
+          ./scripts/feeds install xtables-addons
 
           mkdir -p package/feeds/packages/xtables-wgobfs
           wget https://raw.githubusercontent.com/infinet/xt_wgobfs/refs/heads/main/openwrt/package/Makefile -O package/feeds/packages/xtables-wgobfs/Makefile
@@ -80,8 +82,11 @@ jobs:
 
           cat ./build_dir/target-*/linux-*/linux-*/.vermagic || true
 
-          echo "    > make toolchain/install"
-          make toolchain/install  -i -j `nproc`
+          # Если toolchain уже кэширован, пропускаем его сборку
+          if [ "${{ steps.cache-tools-kernel.outputs.cache-hit }}" != "true" ]; then
+            echo "    > make toolchain/install"
+            make toolchain/install -i -j `nproc`
+          fi
 
           cat ./build_dir/target-*/linux-*/linux-*/.vermagic || true
 
@@ -119,7 +124,7 @@ jobs:
           make V=s package/amneziawg-tools/{clean,download,prepare}
           make V=s package/amneziawg-tools/compile
 
-          ./scripts/feeds install xtables-addons
+          #./scripts/feeds install xtables-addons
           make V=s package/xtables-wgobfs/{clean,download,prepare}
           make V=s package/xtables-wgobfs/compile
           
