@@ -132,7 +132,7 @@ jobs:
           cp bin/packages/${{ matrix.build_env.pkgarch }}/awgopenwrt/luci-app-amneziawg_*.ipk awgrelease/luci-app-amneziawg_${postfix}.ipk
           cp bin/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/packages/kmod-amneziawg_*.ipk awgrelease/kmod-amneziawg_${postfix}.ipk
 
-          cp bin/packages/${{ matrix.build_env.pkgarch }}/awgopenwrt/iptables-mod-wgobfs_*.ipk awgrelease/iptables-mod-wgobfs_${postfix}.ipk
+          cp bin/packages/${{ matrix.build_env.pkgarch }}/packages/iptables-mod-wgobfs_*.ipk awgrelease/iptables-mod-wgobfs_${postfix}.ipk
           cp bin/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/packages/kmod-ipt-wgobfs_*.ipk awgrelease/kmod-ipt-wgobfs_${postfix}.ipk
 
       - name: Release
