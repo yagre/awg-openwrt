@@ -58,6 +58,7 @@ jobs:
           #####   && ./scripts/feeds install -a
           ./scripts/feeds install xtables-addons
 
+          git clone https://github.com/infinet/xt_wgobfs.git package/xt_wgobfs
           mkdir -p package/feeds/packages/xtables-wgobfs
           wget https://raw.githubusercontent.com/infinet/xt_wgobfs/refs/heads/main/openwrt/package/Makefile -O package/feeds/packages/xtables-wgobfs/Makefile
           
