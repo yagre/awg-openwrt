@@ -124,6 +124,11 @@ jobs:
           make V=s package/amneziawg-tools/{clean,download,prepare}
           make V=s package/amneziawg-tools/compile
 
+          ./scripts/feeds install xtables-addons
+          ./scripts/feeds update -a
+          # It has similar dependencies as xtables-addon. Install these dependencies by
+          # preparing for xtables-addons.
+          ./scripts/feeds install xtables-addons
           #./scripts/feeds install xtables-addons
           make V=s package/xtables-wgobfs/{clean,download,prepare}
           make V=s package/xtables-wgobfs/compile
