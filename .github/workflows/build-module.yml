@@ -46,37 +46,37 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-vm4-cache-tools-kernel-${{ matrix.build_env.tag }}-${{ matrix.build_env.pkgarch}}-
 
-      - name: Building kernel and tools
-        #if: ${{ steps.cache-tools-kernel.outputs.cache-hit != 'true' }}
-        run: |
-          echo "pkgarch: ${{ matrix.build_env.pkgarch}}, target:${{ matrix.build_env.target}}, subtarget: ${{ matrix.build_env.subtarget}}"
+- name: Building kernel and tools
+  run: |
+    echo "pkgarch: ${{ matrix.build_env.pkgarch}}, target:${{ matrix.build_env.target}}, subtarget: ${{ matrix.build_env.subtarget}}"
 
-          # Setup & install feeds
-          wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/feeds.buildinfo -O feeds.conf
-          echo "src-git awgopenwrt https://github.com/yury-sannikov/awg-openwrt.git" >> ./feeds.conf
-          ./scripts/feeds update 
-          #####   && ./scripts/feeds install -a
-          ./scripts/feeds install xtables-addons
+    # Setup & install feeds
+    wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/feeds.buildinfo -O feeds.conf
+    echo "src-git awgopenwrt https://github.com/yury-sannikov/awg-openwrt.git" >> ./feeds.conf
+    
+    # Обновляем и устанавливаем feeds один раз
+    ./scripts/feeds update -a
+    ./scripts/feeds install -a
+    ./scripts/feeds install xtables-addons
 
-          git clone https://github.com/infinet/xt_wgobfs.git package/xt_wgobfs
-          mkdir -p package/feeds/packages/xtables-wgobfs
-          wget https://raw.githubusercontent.com/infinet/xt_wgobfs/refs/heads/main/openwrt/package/Makefile -O package/feeds/packages/xtables-wgobfs/Makefile
-          
-          # Setup config with AWG and dependencies
-          wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/config.buildinfo -O .config
-          echo "CONFIG_PACKAGE_kmod-amneziawg=m" >> .config
-          echo "CONFIG_PACKAGE_amneziawg-tools=y" >> .config
-          echo "CONFIG_PACKAGE_luci-app-amneziawg=y" >> .config
-          echo "CONFIG_PACKAGE_kmod-crypto-lib-chacha20=m" >> .config
-          echo "CONFIG_PACKAGE_kmod-crypto-lib-chacha20poly1305=m" >> .config
-          echo "CONFIG_PACKAGE_kmod-crypto-chacha20poly1305=m" >> .config
-          echo "CONFIG_PACKAGE_iptables-mod-wgobfs=m" >> .config
-          echo "CONFIG_PACKAGE_iptables-nft=m" >> .config
-          echo "CONFIG_PACKAGE_xtables-nft=m" >> .config
+    # Клонируем и настраиваем xt_wgobfs ПРАВИЛЬНО
+    git clone https://github.com/infinet/xt_wgobfs.git package/xt_wgobfs
+    mkdir -p package/xtables-wgobfs
+    wget https://raw.githubusercontent.com/infinet/xt_wgobfs/main/openwrt/package/Makefile -O package/xtables-wgobfs/Makefile
+    
+    # Setup config
+    wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/config.buildinfo -O .config
+    echo "CONFIG_PACKAGE_kmod-amneziawg=m" >> .config
+    echo "CONFIG_PACKAGE_amneziawg-tools=y" >> .config
+    echo "CONFIG_PACKAGE_luci-app-amneziawg=y" >> .config
+    echo "CONFIG_PACKAGE_kmod-crypto-lib-chacha20=m" >> .config
+    echo "CONFIG_PACKAGE_kmod-crypto-lib-chacha20poly1305=m" >> .config
+    echo "CONFIG_PACKAGE_kmod-crypto-chacha20poly1305=m" >> .config
+    echo "CONFIG_PACKAGE_iptables-mod-wgobfs=m" >> .config
+    echo "CONFIG_PACKAGE_iptables-nft=m" >> .config
+    echo "CONFIG_PACKAGE_xtables-nft=m" >> .config
 
-
-
-          make defconfig
+    make defconfig
 
           echo "    > make tools/install"
           make tools/install -i -j `nproc`
@@ -103,37 +103,37 @@ jobs:
             exit 1
           fi
 
-      - name: Build AmneziaWG
-        run: |
-          VERMAGIC=`cat ./build_dir/target-*/linux-*/linux-*/.vermagic`
-          echo "Vermagic: $VERMAGIC"
+- name: Build AmneziaWG and xt_wgobfs
+  run: |
+    VERMAGIC=`cat ./build_dir/target-*/linux-*/linux-*/.vermagic`
+    echo "Vermagic: $VERMAGIC"
 
-          VERMAGIC_EXPECTED=${{ matrix.build_env.vermagic }}
+    VERMAGIC_EXPECTED=${{ matrix.build_env.vermagic }}
+    if [ "$VERMAGIC" != "$VERMAGIC_EXPECTED" ]; then
+      echo Vermagic mismatch: $VERMAGIC, expected $VERMAGIC_EXPECTED
+      exit 1
+    fi
 
-          if [ "$VERMAGIC" != "$VERMAGIC_EXPECTED" ]; then
-            echo Vermagic mismatch: $VERMAGIC, expected $VERMAGIC_EXPECTED
-            exit 1
-          fi
+    # Собираем AmneziaWG компоненты
+    make package/kmod-amneziawg/{clean,download,prepare} V=s || true
+    make package/kmod-amneziawg/compile V=s || true
 
-          # Ignore kmod build for some targets, replace with the awg-go
-          make package/kmod-amneziawg/{clean,download,prepare} V=s || true
-          make package/kmod-amneziawg/compile V=s || true
+    make package/luci-app-amneziawg/{clean,download,prepare}
+    make package/luci-app-amneziawg/compile V=s
 
-          make package/luci-app-amneziawg/{clean,download,prepare}
-          make package/luci-app-amneziawg/compile V=s
+    make V=s package/amneziawg-tools/{clean,download,prepare}
+    make V=s package/amneziawg-tools/compile
 
-          make V=s package/amneziawg-tools/{clean,download,prepare}
-          make V=s package/amneziawg-tools/compile
+    # Собираем xtables-wgobfs
+    echo "Building xtables-wgobfs..."
+    make V=s package/xtables-wgobfs/{clean,download,prepare}
+    make V=s package/xtables-wgobfs/compile
+    
+    # Также попробуйте собрать через feeds если прямой способ не работает
+    ./scripts/feeds install xtables-wgobfs || true
+    make V=s package/feeds/packages/xtables-wgobfs/compile || true
 
-          ./scripts/feeds install xtables-addons
-          ./scripts/feeds update -a
-          # It has similar dependencies as xtables-addon. Install these dependencies by
-          # preparing for xtables-addons.
-          ./scripts/feeds install xtables-addons
-          #./scripts/feeds install xtables-addons
-          make V=s package/xtables-wgobfs/{clean,download,prepare}
-          make V=s package/xtables-wgobfs/compile
-          
+    
       - name: Prepare artifacts
         run: |
           tag_name=${{  github.ref_name }}
