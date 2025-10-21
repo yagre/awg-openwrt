@@ -77,7 +77,19 @@ jobs:
           echo "CONFIG_PACKAGE_kmod-ipt-wgobfs=m" >> .config
           echo "CONFIG_PACKAGE_iptables-mod-wgobfs=m" >> .config
       
+            
+          # Пропускаем проблемные пакеты на первом этапе
+          # echo "CONFIG_PACKAGE_iptables-mod-wgobfs=m" >> .config
+          
           make defconfig
+          
+          # Теперь добавляем xtables-wgobfs через меню конфигурации
+          ./scripts/feeds/update -a
+          ./scripts/feeds/install -a
+          ./scripts/feeds/install xtables-addons
+          
+          # Пробуем добавить пакет другим способом
+          make menuconfig || true
       
                 echo "    > make tools/install"
                 make tools/install -i -j `nproc`
