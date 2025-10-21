@@ -74,7 +74,8 @@ jobs:
           echo "CONFIG_PACKAGE_kmod-crypto-chacha20poly1305=m" >> .config
           echo "CONFIG_PACKAGE_iptables-mod-wgobfs=m" >> .config
           echo "CONFIG_PACKAGE_iptables-nft=m" >> .config
-          echo "CONFIG_PACKAGE_xtables-nft=m" >> .config
+          echo "CONFIG_PACKAGE_kmod-ipt-wgobfs=m" >> .config
+          echo "CONFIG_PACKAGE_iptables-mod-wgobfs=m" >> .config
       
           make defconfig
       
