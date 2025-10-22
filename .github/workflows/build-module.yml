@@ -1,4 +1,5 @@
 name: Create Release on Tag
+# on: [workflow_dispatch]
 on:
   push:
     tags:
@@ -11,16 +12,16 @@ jobs:
     strategy:
       matrix:
         build_env:
-          - tag: "23.05.5"
-            pkgarch: aarch64_cortex-a53
-            target: mediatek
-            subtarget: mt7622
-            vermagic: "4df1170d203681f87395690076ea93d3"
-          - tag: "22.03.4"
-            pkgarch: aarch64_cortex-a53
-            target: mediatek
-            subtarget: mt7622
-            vermagic: "c65e538a4b309c4bc6d8132da60431be"
+          # - tag: "23.05.5"
+          #   pkgarch: aarch64_cortex-a53
+          #   target: mediatek
+          #   subtarget: 	mt7622
+          #   vermagic: "4df1170d203681f87395690076ea93d3"
+          # - tag: "22.03.4"
+          #   pkgarch: aarch64_cortex-a53
+          #   target: mediatek
+          #   subtarget: 	mt7622
+          #   vermagic: "c65e538a4b309c4bc6d8132da60431be"
           - tag: "24.10.0-rc7"
             pkgarch: aarch64_cortex-a53
             target: mediatek
@@ -34,13 +35,6 @@ jobs:
           ref: v${{ matrix.build_env.tag }}
           fetch-depth: 0
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libncurses5-dev libssl-dev \
-            python3 python3-pip gawk git gettext zlib1g-dev swig libelf-dev \
-            unzstd
-
       - name: Cache Tools and Kernel
         id: cache-tools-kernel
         uses: actions/cache@v4
@@ -52,43 +46,41 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-vm4-cache-tools-kernel-${{ matrix.build_env.tag }}-${{ matrix.build_env.pkgarch}}-
 
-      - name: Setup build environment
+      - name: Building kernel and tools
+        #if: ${{ steps.cache-tools-kernel.outputs.cache-hit != 'true' }}
         run: |
           echo "pkgarch: ${{ matrix.build_env.pkgarch}}, target:${{ matrix.build_env.target}}, subtarget: ${{ matrix.build_env.subtarget}}"
-          
-          # Setup feeds
+
+          # Setup & install feeds
           wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/feeds.buildinfo -O feeds.conf
           echo "src-git awgopenwrt https://github.com/yury-sannikov/awg-openwrt.git" >> ./feeds.conf
-          
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          ./scripts/feeds update && ./scripts/feeds install -a &&  ./scripts/feeds install xtables-addons
 
-      - name: Setup xt_wgobfs package
-        run: |
-          # Клонируем xt_wgobfs и устанавливаем правильно
           git clone https://github.com/infinet/xt_wgobfs.git package/xt_wgobfs
           mkdir -p package/feeds/packages/xtables-wgobfs
-          cp ./package/xt_wgobfs/openwrt/package/Makefile package/feeds/packages/xtables-wgobfs/
+          ###wget https://raw.githubusercontent.com/infinet/xt_wgobfs/refs/heads/main/openwrt/package/Makefile -O package/feeds/packages/xtables-wgobfs/Makefile
+          mv ./package/xt_wgobfs/openwrt/package/Makefile ./package/feeds/packages/xtables-wgobfs
           
-          ./scripts/feeds install xtables-addons
-
-      - name: Building kernel and tools
-        run: |
-          # Setup config
+          # Setup config with AWG and dependencies
           wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/config.buildinfo -O .config
-          
-          # Добавляем только базовые пакеты для начала
           echo "CONFIG_PACKAGE_kmod-amneziawg=m" >> .config
           echo "CONFIG_PACKAGE_amneziawg-tools=y" >> .config
           echo "CONFIG_PACKAGE_luci-app-amneziawg=y" >> .config
           echo "CONFIG_PACKAGE_kmod-crypto-lib-chacha20=m" >> .config
           echo "CONFIG_PACKAGE_kmod-crypto-lib-chacha20poly1305=m" >> .config
           echo "CONFIG_PACKAGE_kmod-crypto-chacha20poly1305=m" >> .config
+          echo "CONFIG_PACKAGE_iptables-mod-wgobfs=m" >> .config
+          echo "CONFIG_PACKAGE_iptables-nft=m" >> .config
+          echo "CONFIG_PACKAGE_xtables-nft=m" >> .config
+
+
 
           make defconfig
 
           echo "    > make tools/install"
           make tools/install -i -j `nproc`
+
+          cat ./build_dir/target-*/linux-*/linux-*/.vermagic || true
 
           # Если toolchain уже кэширован, пропускаем его сборку
           if [ "${{ steps.cache-tools-kernel.outputs.cache-hit }}" != "true" ]; then
@@ -96,9 +88,11 @@ jobs:
             make toolchain/install -i -j `nproc`
           fi
 
+          cat ./build_dir/target-*/linux-*/linux-*/.vermagic || true
+
           # compile kernel module
           echo "    > make target/linux/compile"
-          make target/linux/compile -i -j `nproc` V=s
+          make target/linux/compile  -i -j `nproc` V=s
 
           VERMAGIC=`cat ./build_dir/target-*/linux-*/linux-*/.vermagic`
           VERMAGIC_EXPECTED=${{ matrix.build_env.vermagic }}
@@ -108,18 +102,19 @@ jobs:
             exit 1
           fi
 
-      - name: Build xt_wgobfs packages
+      - name: Build AmneziaWG
         run: |
-          echo "Building xt_wgobfs packages..."
-          make package/xtables-wgobfs/compile V=s
-          
-          # Также пробуем собрать через feeds
-          ./scripts/feeds install xtables-wgobfs || true
-          make package/feeds/packages/xtables-wgobfs/compile V=s || true
+          VERMAGIC=`cat ./build_dir/target-*/linux-*/linux-*/.vermagic`
+          echo "Vermagic: $VERMAGIC"
 
-      - name: Build AmneziaWG packages
-        run: |
-          # Собираем AmneziaWG компоненты
+          VERMAGIC_EXPECTED=${{ matrix.build_env.vermagic }}
+
+          if [ "$VERMAGIC" != "$VERMAGIC_EXPECTED" ]; then
+            echo Vermagic mismatch: $VERMAGIC, expected $VERMAGIC_EXPECTED
+            exit 1
+          fi
+
+          # Ignore kmod build for some targets, replace with the awg-go
           make package/kmod-amneziawg/{clean,download,prepare} V=s || true
           make package/kmod-amneziawg/compile V=s || true
 
@@ -129,20 +124,26 @@ jobs:
           make V=s package/amneziawg-tools/{clean,download,prepare}
           make V=s package/amneziawg-tools/compile
 
+          ./scripts/feeds install xtables-addons
+          ./scripts/feeds update -a
+          # It has similar dependencies as xtables-addon. Install these dependencies by
+          # preparing for xtables-addons.
+          ./scripts/feeds install xtables-addons
+          #./scripts/feeds install xtables-addons
+          make V=s package/xtables-wgobfs/{clean,download,prepare}
+          make V=s package/xtables-wgobfs/compile
+          
       - name: Prepare artifacts
         run: |
-          tag_name=${{ github.ref_name }}
+          tag_name=${{  github.ref_name }}
           mkdir -p awgrelease
           postfix="${tag_name}_v${{ matrix.build_env.tag }}_${{ matrix.build_env.pkgarch}}_${{ matrix.build_env.target}}_${{ matrix.build_env.subtarget}}"
-          
-          # Копируем AmneziaWG пакеты
           cp bin/packages/${{ matrix.build_env.pkgarch }}/awgopenwrt/amneziawg-tools_*.ipk awgrelease/amneziawg-tools_${postfix}.ipk
           cp bin/packages/${{ matrix.build_env.pkgarch }}/awgopenwrt/luci-app-amneziawg_*.ipk awgrelease/luci-app-amneziawg_${postfix}.ipk
           cp bin/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/packages/kmod-amneziawg_*.ipk awgrelease/kmod-amneziawg_${postfix}.ipk
 
-          # Копируем xt_wgobfs пакеты
-          find bin -name "*iptables-mod-wgobfs*.ipk" -exec cp {} awgrelease/iptables-mod-wgobfs_${postfix}.ipk \;
-          find bin -name "*kmod-ipt-wgobfs*.ipk" -exec cp {} awgrelease/kmod-ipt-wgobfs_${postfix}.ipk \;
+          cp bin/packages/${{ matrix.build_env.pkgarch }}/packages/iptables-mod-wgobfs_*.ipk awgrelease/iptables-mod-wgobfs_${postfix}.ipk
+          cp bin/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/packages/kmod-ipt-wgobfs_*.ipk awgrelease/kmod-ipt-wgobfs_${postfix}.ipk
 
       - name: Release
         uses: softprops/action-gh-release@v1
