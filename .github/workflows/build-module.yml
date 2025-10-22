@@ -12,16 +12,16 @@ jobs:
     strategy:
       matrix:
         build_env:
-          - tag: "23.05.5"
-            pkgarch: aarch64_cortex-a53
-            target: mediatek
-            subtarget: 	mt7622
-            vermagic: "4df1170d203681f87395690076ea93d3"
-          - tag: "22.03.4"
-            pkgarch: aarch64_cortex-a53
-            target: mediatek
-            subtarget: 	mt7622
-            vermagic: "c65e538a4b309c4bc6d8132da60431be"
+          # - tag: "23.05.5"
+          #   pkgarch: aarch64_cortex-a53
+          #   target: mediatek
+          #   subtarget: 	mt7622
+          #   vermagic: "4df1170d203681f87395690076ea93d3"
+          # - tag: "22.03.4"
+          #   pkgarch: aarch64_cortex-a53
+          #   target: mediatek
+          #   subtarget: 	mt7622
+          #   vermagic: "c65e538a4b309c4bc6d8132da60431be"
           - tag: "24.10.0-rc7"
             pkgarch: aarch64_cortex-a53
             target: mediatek
@@ -54,13 +54,12 @@ jobs:
           # Setup & install feeds
           wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/feeds.buildinfo -O feeds.conf
           echo "src-git awgopenwrt https://github.com/yury-sannikov/awg-openwrt.git" >> ./feeds.conf
-          ./scripts/feeds update 
-          #####   && ./scripts/feeds install -a
-          ./scripts/feeds install xtables-addons
+          ./scripts/feeds update && ./scripts/feeds install -a &&  ./scripts/feeds install xtables-addons
 
           git clone https://github.com/infinet/xt_wgobfs.git package/xt_wgobfs
           mkdir -p package/feeds/packages/xtables-wgobfs
-          wget https://raw.githubusercontent.com/infinet/xt_wgobfs/refs/heads/main/openwrt/package/Makefile -O package/feeds/packages/xtables-wgobfs/Makefile
+          ###wget https://raw.githubusercontent.com/infinet/xt_wgobfs/refs/heads/main/openwrt/package/Makefile -O package/feeds/packages/xtables-wgobfs/Makefile
+          mv ./package/xt_wgobfs/openwrt/package/Makefile ./package/feeds/packages/xtables-wgobfs
           
           # Setup config with AWG and dependencies
           wget https://downloads.openwrt.org/releases/${{ matrix.build_env.tag }}/targets/${{ matrix.build_env.target}}/${{ matrix.build_env.subtarget}}/config.buildinfo -O .config
